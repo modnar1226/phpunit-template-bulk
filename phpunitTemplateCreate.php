@@ -4,7 +4,7 @@
         // folder where all generated the files will be
         $parentDir = 'UnitTestsAutoGen';
         // get file contents of specifiled folder or use the default folders (models & controllers)
-        $dirsToRead = readDirs($filepath);
+        $dirsToRead = getPathContents($filepath);
         // make the directory if it doesn't exist
         if (!is_dir($parentDir) && !file_exists($parentDir)){
             mkdir($parentDir,0755);
@@ -13,16 +13,15 @@
         foreach ($dirsToRead as $key => $dir){
             // for each file 
             foreach ($dir as $inFile){
-                // make the sub folders $parentFolder + file path 
-                if (!is_dir($parentDir . $key) && !file_exists($parentDir . $key)){
-                    mkdir($parentDir . $key,0755);
-                }
+                
                 // file name for output
                 $outFile = substr($inFile, 0, -4) . "Test.php";
                 // open file to read from
-                $readFile = fopen('./' . $key . '/' . $inFile, 'r');
-                // open file to write to
-                $writeFile = fopen($outFile, 'a+');
+                if ($key === '.') {
+                    $readFile = fopen($key . '/' . $inFile, 'r');
+                } else {
+                    $readFile = fopen('./' . $key . '/' . $inFile, 'r');
+                }
                 // comment field before class delcaration
                 $classPrepend = "/**\n *\n */\n";
                 // comment field before funtion declarations
@@ -103,85 +102,95 @@
                         $write[] = "}\n?>";
                     }
                 }
-                // write to the file
-                foreach ($write as $line){
-                    fwrite($writeFile, $line);
-                }
-                // close files
+                // close read file
                 fclose($readFile);
-                fclose($writeFile);
-                // move created file to its proper sub folder
-                rename($outFile, $parentDir . $key . '/' . $outFile);
-            }
-        }
-    }
-    function readsDirs($filepath = null)
-    {
-        // was a file path provided?
-        if ($filepath === null){
-            // default file paths
-            $directories = array(
-                './models',
-                './controllers'
-            );
-        } else {
-            // specified file path
-            $directories = explode(',', $filepath);
-        }
-        // array of all folders 
-        $results = array();
-        foreach ($directories as $dir){
-            if (is_dir($dir)){
-                if ($handle = opendir($dir)){
-                    $dir = str_replace('.', '', $dir);
-                    while(($file = readdir($handle)) !== FALSE){
-                        if ($file === '.' || $file === '..'){
-                            continue;
-                        } else {
-                            $results[$dir][] = $file;
-                            //$results[] = $file;
+
+                // check that there is something to write
+                if (!empty($write)) {
+                    $allowedToWrite = false;
+                    foreach ($write as $line) {
+                        if (preg_match('/class/', $line) || preg_match('/function/', $line)) {
+                            $allowedToWrite = true;
+                            break;
                         }
                     }
-                    closedir($handle);
+                    // make the sub folders $parentFolder + file path 
+                    if ($allowedToWrite) {
+                        if ($key !== '.') {
+                            if (!is_dir($parentDir . $key) && !file_exists($parentDir . $key)){
+                                //echo $key . "\n";
+                                mkdir($parentDir . $key, 0755, true);
+                            }
+                        }
+                        // open file to write to
+                        $writeFile = fopen($outFile, 'a+');
+                        // write to the file
+                        foreach ($write as $line){
+                            fwrite($writeFile, $line);
+                        }
+                        // close write file
+                        fclose($writeFile);
+                        // move created file to its proper sub folder
+                        if ($key !== '.') {
+                            rename($outFile, $parentDir . $key . '/' . $outFile);
+                        } else {
+                            rename($outFile, $parentDir . '/' . $outFile);
+                        }
+                    }
                 }
             }
         }
-        return $results;
     }
-
-    function readDirs($filePath=null) {
+    
+    function getPathContents($path)
+    {
          // was a file path provided?
-         if ($filePath === null){
+         if ($path === null){
             // default file paths in codeigniter 3.0
             $dirs = array(
                 './models',
                 './controllers'
             );
         } else{
-            // file path was provided it can be a comma separated list or singular filepath
-            $dirs = explode(',', $filePath);
+            // file path was provided
+            // it can be a comma separated list or singular filepath or file
+            $dirs = explode(',', $path);
         }
         // final array
         $contents = array();
-        // for each file path
+        // for each directory / file given
         foreach ($dirs as $dir) {
-            // for each possible file 
-            foreach (scandir($dir) as $node) {
-                if ($node == '.' || $node == '..') {
-                    continue;
-                }
-                // if its not a directory
-                if (!is_dir($dir . '/' . $node)) {
-                    // does the file end in '.php'?
-                    if (substr($node, -4) === '.php') {
-                        // remove the leading period of directory and store file name
-                        $contents[str_replace('.', '', $dir)][] = $node;
+            // is it a directory?
+            if (is_dir($dir)) {
+                // scan the directory and for each file inside
+                foreach (scandir($dir) as $node) {
+                    // skip current and parent directory
+                    if ($node === '.' || $node === '..') {
+                        continue;
+                    } else {
+                        // check for sub directories
+                        if (is_dir($dir . '/' . $node)) {
+                            // recursive check for sub directories
+                            $recurseArray = getPathContents($dir . '/' . $node);
+                            // merge current and recursive results
+                            $contents = array_merge($contents, $recurseArray);
+                        } else {
+                            // it a file, put it in the array if it's extension is '.php'
+                            if (substr($node, -4) === '.php') {
+                                // don'r remove periods if current or parent directory was input
+                                if ($dir === '.' || $dir === '..') {
+                                    $contents[$dir][] = $node;
+                                } else {
+                                    // remove period from directory name 
+                                    $contents[str_replace('.', '', $dir)][] = $node;
+                                }
+                            }
+                        }
                     }
-                } else {
-                    // it is a directory rerun the function 
-                    $recurseArray = readDirs($dir . '/' . $node);
-                    $contents = array_merge($contents, $recurseArray);
                 }
+            } else {
+                // file name was given
+                $contents[] = $dir; 
             }
         }
         return $contents;
