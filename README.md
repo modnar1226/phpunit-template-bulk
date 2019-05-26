@@ -9,7 +9,7 @@ STEP 2:
 
 Open folder UnitTestsAutoGen/ 
 
-Inside will be a clone of the directory structure with template files cloned from existing classes and functions. 
+Inside will be a clone of the directory structure with template files cloned from existing classes and functions. Only files that contain classes and or functions will be cloned.
 
 The files are named and written to be ready to test via phpunit. The only thing they need is for you to write the tests for your code inside the templates.
 
