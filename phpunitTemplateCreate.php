@@ -15,7 +15,9 @@
             foreach ($dir as $inFile){
                 
                 // file name for output
-                $outFile = substr($inFile, 0, -4) . "Test.php";
+                $firstPeriodPos = strpos($inFile,'.');
+                $outFile = substr($inFile, 0, $firstPeriodPos) . "Test";
+                $outFile .= substr($inFile, $firstPeriodPos);
                 // open file to read from
                 if ($key === '.') {
                     $readFile = fopen($key . '/' . $inFile, 'r');
@@ -25,9 +27,11 @@
                 // comment field before class delcaration
                 $classPrepend = "/**\n *\n */\n";
                 // comment field before funtion declarations
-                $functionPrepend = "\t/**\n\t *\n\t */\n";
+                $classFunctionPrepend = "\t/**\n\t *\n\t */\n";
+                $functionPrepend = "/**\n *\n */\n";
                 // reset the array that will be written
                 $write = array(); 
+                $write[] = "<?php\n";
                 // do work until end of file
                 while(! feof($readFile)){
                     //each line
@@ -42,12 +46,18 @@
                          *  text to write:
                          *  conatins php open tag, 
                          *  comment field, 
-                         *  first two words in array, and 'extend UnitTest'  
+                         *  first two words in array, and 'extends UnitTest'  
                          */ 
-                        $write[] = "<?php\n" . $classPrepend . $words[0] . ' ' . $words[1] . "Test extends TestCase\n{\n";
+                        $write[] = $classPrepend . $words[0] . ' ' . $words[1] . "Test extends TestCase\n{\n";
+                    } else if (preg_match('/^abstract\sclass /', $line)) {
+                        // trim and remove brackets if it exists
+                        $line = trim(str_replace("{", "", $line));
+                            // array of words in class declaration
+                            $words = explode(' ', $line);
+                            $write[] = $classPrepend . $words[0] . ' ' . $words[1] . ' ' . $words[2] . "Test extends TestCase\n{\n";
                     }
                     // do the lines contain function declarations? 
-                    if (preg_match('/\s+public\sfunction/', $line)){
+                    if (preg_match('/^\s+public\sfunction/', $line) && (!preg_match('/^\s+\/\//', $line) && !preg_match('/^\/\//', $line))){
                         // replace any brackets on the line
                         $line = str_replace("{", "", $line);
                         // replace "public funciton" then trim
@@ -58,48 +68,59 @@
                         // and brackets with newlines & tabs for formatting
                         $line = "\tpublic function test$line\n\t{\n\n\t}\n\n";
                         // add to write array
-                        $write[] = $functionPrepend . $line;
-                    } else if (preg_match('/\s+private\sfunction/', $line)){
+                        $write[] = $classFunctionPrepend . $line;
+                    } else if (preg_match('/^\s+private\sfunction/', $line) && (!preg_match('/^\s+\/\//', $line) && !preg_match('/^\/\//', $line))){
                         $line = str_replace("{", "", $line);
                         $line = trim(str_replace("private function", "", $line));
                         $line = ucfirst($line);
                         $line = "\tprivate function test$line\n\t{\n\n\t}\n\n";
-                        $write[] = $functionPrepend . $line;
-                    } else if (preg_match('/\s+protected\sfunction/', $line)){
+                        $write[] = $classFunctionPrepend . $line;
+                    } else if (preg_match('/^\s+protected\sfunction/', $line) && (!preg_match('/^\s+\/\//', $line) && !preg_match('/^\/\//', $line))){
                         $line = str_replace("{", "", $line);
                         $line = trim(str_replace("protected function", "", $line));
                         $line = ucfirst($line);
                         $line = "\tprotected function test$line\n\t{\n\n\t}\n\n";
-                        $write[] = $functionPrepend . $line;
-                    } else if (preg_match('/\s+public\sstatic\sfunction/', $line)){
+                        $write[] = $classFunctionPrepend . $line;
+                    } else if (preg_match('/^\s+public\sstatic\sfunction/', $line) && (!preg_match('/^\s+\/\//', $line) && !preg_match('/^\/\//', $line))){
                         $line = str_replace("{", "", $line);
                         $line = trim(str_replace("public static function", "", $line));
                         $line = ucfirst($line);
                         $line = "\tpublic static function test$line\n\t{\n\n\t}\n\n";
-                        $write[] = $functionPrepend . $line;
-                    } else if (preg_match('/\s+private\sstatic\sfunction/', $line)){
+                        $write[] = $classFunctionPrepend . $line;
+                    } else if (preg_match('/^\s+private\sstatic\sfunction/', $line) && (!preg_match('/^\s+\/\//', $line) && !preg_match('/^\/\//', $line))){
                         $line = str_replace("{", "", $line);
                         $line = trim(str_replace("private static function", "", $line));
                         $line = ucfirst($line);
                         $line = "\tprivate static function test$line\n\t{\n\n\t}\n\n";
-                        $write[] = $functionPrepend . $line;
-                    } else if (preg_match('/\s+protected\sstatic\sfunction/', $line)){
+                        $write[] = $classFunctionPrepend . $line;
+                    } else if (preg_match('/^\s+protected\sstatic\sfunction/', $line) && (!preg_match('/^\s+\/\//', $line) && !preg_match('/^\/\//', $line))){
                         $line = str_replace("{", "", $line);
                         $line = trim(str_replace("protected static function", "", $line));
                         $line = ucfirst($line);
                         $line = "\tprotected static function test$line\n\t{\n\n\t}\n\n";
+                        $write[] = $classFunctionPrepend . $line;
+                    } else if (preg_match('/^\s+function/', $line) && (!preg_match('/^\s+\/\//', $line) && !preg_match('/^\/\//', $line) && !preg_match('/^\s+function\s\(/', $line))){
+                        $line = str_replace("{", "", $line);
+                        $line = trim(str_replace("function", "", $line));
+                        $line = ucfirst($line);
+                        $line = "\tfunction test$line\n\t{\n\n\t}\n\n";
+                        $write[] = $classFunctionPrepend . $line;
+                    } else if (preg_match('/^function/', $line) && (!preg_match('/^\s+\/\//', $line) && !preg_match('/^\/\//', $line))){
+                        $line = str_replace("{", "", $line);
+                        $line = trim(str_replace("function", "", $line));
+                        $line = ucfirst($line);
+                        $line = "function test$line\n{\n\n";
                         $write[] = $functionPrepend . $line;
-                    }
-                    /**
-                     *  put the end of class bracket, 
-                     *  check if we commented, "} // end" or  "}// end" or "}//end"
-                     *  or if the line starts with a brakcet
-                     */
-                    if (preg_match('/\}\s\/\/\send/', $line) ||
-                        preg_match('/\}\/\/\send/', $line) ||
-                        preg_match('/\}\/\/end/', $line) ||
+                    } else if (preg_match('/^\}\s\/\/\send/', $line) ||
+                        preg_match('/^\}\/\/\send/', $line) ||
+                        preg_match('/^\}\/\/end/', $line) ||
                         preg_match('/^\}/', $line)){
-                        $write[] = "}\n?>";
+                            /**
+                             *  put the end of class bracket, 
+                             *  check if we commented, "} // end" or  "}// end" or "}//end"
+                             *  or if the line starts with a brakcet
+                             */
+                            $write[] = "}\n\n";
                     }
                 }
                 // close read file
